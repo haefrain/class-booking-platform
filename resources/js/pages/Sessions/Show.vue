@@ -1,15 +1,50 @@
 <script setup lang="ts">
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { ref } from 'vue';
 import { formatSessionDay, formatTimeRange, priceLabel } from '@/lib/date';
 import { login } from '@/routes';
-import type { SessionSummary, ViewerCta } from '@/types/booking';
+import type { SessionSummary } from '@/types/booking';
 
-defineProps<{
+const props = defineProps<{
     session: SessionSummary;
-    viewer: { cta: ViewerCta };
+    viewer: {
+        cta: string;
+        booking_id: number | null;
+        waitlist_entry_id: number | null;
+        cancellable_until: string | null;
+    };
 }>();
 
 const page = usePage();
+const busy = ref(false);
+
+function submit(
+    method: 'post' | 'delete',
+    url: string,
+    data: Record<string, string> = {},
+) {
+    busy.value = true;
+    router.visit(url, {
+        method,
+        data,
+        preserveScroll: true,
+        onFinish: () => (busy.value = false),
+    });
+}
+
+function book() {
+    submit('post', `/sessions/${props.session.id}/bookings`, {
+        idempotency_key: crypto.randomUUID(),
+    });
+}
+
+function cancelBooking() {
+    if (
+        window.confirm('Cancel your booking? Your seat goes to the waitlist.')
+    ) {
+        submit('delete', `/bookings/${props.viewer.booking_id}`);
+    }
+}
 </script>
 
 <template>
@@ -48,7 +83,14 @@ const page = usePage();
                 {{ session.spots_left }} of {{ session.capacity }} spots left
             </p>
 
-            <div class="mt-8">
+            <p
+                v-if="$page.props.errors.domain"
+                class="mt-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+            >
+                {{ $page.props.errors.domain }}
+            </p>
+
+            <div class="mt-8 flex items-center gap-3">
                 <Link
                     v-if="viewer.cta === 'login'"
                     :href="login()"
@@ -56,11 +98,58 @@ const page = usePage();
                 >
                     Log in to book
                 </Link>
+
+                <button
+                    v-else-if="viewer.cta === 'book'"
+                    type="button"
+                    class="inline-flex rounded-lg bg-primary px-5 py-2.5 font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                    :disabled="busy"
+                    :aria-busy="busy"
+                    @click="book"
+                >
+                    Book this class
+                </button>
+
+                <button
+                    v-else-if="viewer.cta === 'join_waitlist'"
+                    type="button"
+                    class="inline-flex rounded-lg bg-primary px-5 py-2.5 font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                    :disabled="busy"
+                    @click="submit('post', `/sessions/${session.id}/waitlist`)"
+                >
+                    Join the waitlist
+                </button>
+
+                <button
+                    v-else-if="viewer.cta === 'leave_waitlist'"
+                    type="button"
+                    class="inline-flex rounded-lg border border-border px-5 py-2.5 font-medium hover:bg-muted disabled:opacity-50"
+                    :disabled="busy"
+                    @click="
+                        submit(
+                            'delete',
+                            `/waitlist/${viewer.waitlist_entry_id}`,
+                        )
+                    "
+                >
+                    Leave the waitlist
+                </button>
+
+                <button
+                    v-else-if="viewer.cta === 'cancel'"
+                    type="button"
+                    class="inline-flex rounded-lg border border-destructive px-5 py-2.5 font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                    :disabled="busy"
+                    @click="cancelBooking"
+                >
+                    Cancel my booking
+                </button>
+
                 <span
                     v-else
                     class="inline-flex rounded-lg border border-border px-5 py-2.5 text-muted-foreground"
                 >
-                    Booking opens soon
+                    Booking unavailable
                 </span>
             </div>
         </main>

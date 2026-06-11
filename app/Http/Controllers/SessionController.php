@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\ClassSessionResource;
 use App\Models\ClassSession;
+use App\Support\SessionViewer;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -16,16 +17,10 @@ class SessionController extends Controller
     {
         $session->load(['classType', 'instructor']);
 
-        // Server-computed CTA: the page is a dumb switch. B3 introduces the
-        // full matrix (book/pay/join_waitlist/…); until then authenticated
-        // viewers see "closed".
-        $cta = $request->user() === null ? 'login' : 'closed';
-
         return Inertia::render('Sessions/Show', [
             'session' => ClassSessionResource::make($session)->resolve(),
-            'viewer' => [
-                'cta' => $cta,
-            ],
+            // Server-computed CTA matrix: the page is a dumb switch.
+            'viewer' => SessionViewer::for($request->user(), $session),
         ]);
     }
 }
