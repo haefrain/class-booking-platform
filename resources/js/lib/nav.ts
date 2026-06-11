@@ -19,6 +19,11 @@ export function navFor(role: Role): NavItem[] {
                     href: adminDashboard(),
                     icon: LayoutGrid,
                 },
+                {
+                    title: 'Sessions',
+                    href: '/admin/sessions',
+                    icon: CalendarDays,
+                },
                 { title: 'Payments', href: '/admin/payments', icon: BookOpen },
             ];
         case 'instructor':
@@ -30,6 +35,13 @@ export function navFor(role: Role): NavItem[] {
                 },
             ];
         case 'student':
-            return [{ title: 'Catalog', href: catalog(), icon: BookOpen }];
+            return [
+                { title: 'Catalog', href: catalog(), icon: BookOpen },
+                {
+                    title: 'My bookings',
+                    href: '/my/bookings',
+                    icon: CalendarDays,
+                },
+            ];
     }
 }
