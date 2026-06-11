@@ -11,10 +11,7 @@ use App\Http\Controllers\Instructor\InstructorSessionController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\StripeWebhookController;
 use App\Http\Controllers\WaitlistController;
-use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 Route::inertia('/', 'Welcome')->name('home');
 
@@ -45,17 +42,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function () {
-        Route::get('/', function () {
-            $heartbeat = Cache::get('scheduler.heartbeat');
-
-            return Inertia::render('Admin/Dashboard', [
-                'scheduler' => [
-                    'last_heartbeat' => $heartbeat,
-                    'healthy' => $heartbeat !== null
-                        && CarbonImmutable::parse((string) $heartbeat)->gt(now()->subMinutes(3)),
-                ],
-            ]);
-        })->name('dashboard');
+        Route::get('/', App\Http\Controllers\Admin\DashboardController::class)->name('dashboard');
+        Route::get('sessions', [App\Http\Controllers\Admin\SessionController::class, 'index'])->name('sessions.index');
 
         Route::get('payments', [PaymentController::class, 'index'])->name('payments.index');
         Route::post('payments/{payment}/retry-refund', [PaymentController::class, 'retryRefund'])->name('payments.retry');
