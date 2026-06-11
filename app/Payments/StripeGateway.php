@@ -84,6 +84,20 @@ class StripeGateway implements PaymentGateway
         ];
     }
 
+    public function refund(string $paymentIntentId, string $idempotencyKey): array
+    {
+        try {
+            $refund = $this->client->refunds->create(
+                ['payment_intent' => $paymentIntentId],
+                ['idempotency_key' => $idempotencyKey],
+            );
+        } catch (ApiErrorException $e) {
+            throw new GatewayException($e->getMessage(), previous: $e);
+        }
+
+        return ['id' => $refund->id];
+    }
+
     public function parseWebhookEvent(string $payload, string $signature): array
     {
         try {

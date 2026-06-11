@@ -29,6 +29,13 @@ interface PaymentGateway
     public function retrieveCheckoutSession(string $checkoutSessionId): array;
 
     /**
+     * @return array{id: string} the refund id
+     *
+     * @throws GatewayException
+     */
+    public function refund(string $paymentIntentId, string $idempotencyKey): array;
+
+    /**
      * @return array{id: string, type: string, data: array<string, mixed>}
      *
      * @throws InvalidWebhookSignatureException

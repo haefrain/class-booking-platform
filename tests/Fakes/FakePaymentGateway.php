@@ -75,6 +75,17 @@ class FakePaymentGateway implements PaymentGateway
         ];
     }
 
+    /** @var list<array{payment_intent: string, idempotency_key: string}> */
+    public array $refundCalls = [];
+
+    public function refund(string $paymentIntentId, string $idempotencyKey): array
+    {
+        $this->maybeFail();
+        $this->refundCalls[] = ['payment_intent' => $paymentIntentId, 'idempotency_key' => $idempotencyKey];
+
+        return ['id' => 're_fake_'.count($this->refundCalls)];
+    }
+
     public function parseWebhookEvent(string $payload, string $signature): array
     {
         // Signature verification is exercised against the REAL StripeGateway
