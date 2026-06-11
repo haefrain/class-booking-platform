@@ -74,13 +74,14 @@ it('shows a session detail with login cta for guests', function () {
         );
 });
 
-it('shows closed cta to authenticated students until booking ships', function () {
+it('shows the book cta to students on a free session with seats', function () {
     $session = ClassSession::factory()->create();
     $this->actingAs(User::factory()->student()->create());
 
+    // The full viewer/state matrix lives in CtaMatrixTest.
     $this->get("/sessions/{$session->id}")
         ->assertOk()
-        ->assertInertia(fn ($page) => $page->where('viewer.cta', 'closed'));
+        ->assertInertia(fn ($page) => $page->where('viewer.cta', 'book'));
 });
 
 it('returns 404 for an unknown session', function () {
