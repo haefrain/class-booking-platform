@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Schedules;
 
+use App\Enums\BookingStatus;
 use App\Enums\SessionStatus;
 use App\Models\Schedule;
 
@@ -13,8 +14,9 @@ use App\Models\Schedule;
  * regenerates them with the current slot settings; past and cancelled rows
  * are history and stay untouched.
  *
- * B3 adds the live-bookings guard: sessions with active bookings must be
- * individually cancelled before they can be regenerated.
+ * Sessions holding live bookings survive: they must be individually
+ * cancelled (each cancellation refunds + promotes) before regeneration can
+ * replace them.
  */
 class RegenerateFutureSessions
 {
@@ -28,6 +30,9 @@ class RegenerateFutureSessions
         $schedule->sessions()
             ->where('status', SessionStatus::Scheduled)
             ->where('starts_at', '>', now())
+            ->whereDoesntHave('bookings', function ($query): void {
+                $query->whereIn('status', [BookingStatus::PendingPayment, BookingStatus::Confirmed]);
+            })
             ->delete();
 
         return $this->generator->handle($schedule);

@@ -11,3 +11,6 @@ Artisan::command('inspire', function () {
 // Keep the rolling session horizon topped up (idempotent — see
 // GenerateSessionsForSchedule).
 Schedule::command('sessions:generate')->dailyAt('03:10');
+
+// Detection layer of the seat-integrity defence (I1–I7).
+Schedule::command('integrity:check')->hourly();
