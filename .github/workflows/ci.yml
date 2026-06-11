@@ -120,6 +120,9 @@ jobs:
       - name: vue-tsc
         run: npm run types:check
 
+      - name: Vitest
+        run: npm run test:unit
+
       - name: Build assets
         run: npm run build
 
