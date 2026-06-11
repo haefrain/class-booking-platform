@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\ClassTypeController;
+use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\ScheduleController;
 use App\Http\Controllers\Admin\SessionOpsController;
 use App\Http\Controllers\BookingController;
@@ -43,6 +44,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function () {
         Route::get('/', fn () => Inertia::render('Admin/Dashboard'))->name('dashboard');
+
+        Route::get('payments', [PaymentController::class, 'index'])->name('payments.index');
+        Route::post('payments/{payment}/retry-refund', [PaymentController::class, 'retryRefund'])->name('payments.retry');
 
         Route::post('sessions/{session}/cancel', [SessionOpsController::class, 'cancel'])->name('sessions.cancel');
         Route::patch('sessions/{session}/capacity', [SessionOpsController::class, 'updateCapacity'])->name('sessions.capacity');

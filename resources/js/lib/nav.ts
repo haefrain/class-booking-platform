@@ -19,6 +19,7 @@ export function navFor(role: Role): NavItem[] {
                     href: adminDashboard(),
                     icon: LayoutGrid,
                 },
+                { title: 'Payments', href: '/admin/payments', icon: BookOpen },
             ];
         case 'instructor':
             return [

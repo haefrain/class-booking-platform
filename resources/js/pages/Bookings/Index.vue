@@ -38,6 +38,26 @@ function cancelBooking(id: number) {
     <div class="flex h-full flex-1 flex-col gap-4 p-4">
         <h1 class="text-xl font-semibold">My bookings</h1>
 
+        <div
+            v-for="offer in bookings.filter(
+                (b) =>
+                    b.status === 'pending_payment' && b.source === 'waitlist',
+            )"
+            :key="`offer-${offer.id}`"
+            class="rounded-lg border border-amber-400/60 bg-amber-400/10 p-4 text-sm"
+        >
+            🎟️ A spot opened in
+            <strong>{{ offer.session.class_type?.name }}</strong> — complete
+            your payment to claim it.
+            <button
+                type="button"
+                class="ml-2 font-medium underline underline-offset-4"
+                @click="router.post(`/bookings/${offer.id}/pay`)"
+            >
+                Pay now
+            </button>
+        </div>
+
         <nav class="flex gap-2" aria-label="Booking tabs">
             <Link
                 v-for="name in TABS"
