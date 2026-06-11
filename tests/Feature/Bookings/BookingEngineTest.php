@@ -177,8 +177,13 @@ it('lets a waiter leave the queue without touching seats', function () {
 it('classifies cancellations as on_time or late around the class type deadline', function () {
     $this->travelTo('2026-06-15 12:00:00');
 
-    // Deadline 24h; session in 48h → on_time.
+    // Deadline 24h; session in 48h → on_time (explicit start: the factory's
+    // random date can land inside the deadline window).
     $early = makeSession();
+    $early->forceFill([
+        'starts_at' => now()->addHours(48),
+        'ends_at' => now()->addHours(49),
+    ])->save();
     $earlyBooking = book($student = User::factory()->student()->create(), $early);
     app(CancelBookingAction::class)->handle($earlyBooking, $student);
     expect($earlyBooking->refresh()->cancellation_kind)->toBe(CancellationKind::OnTime);
