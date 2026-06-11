@@ -7,9 +7,12 @@ namespace Database\Seeders;
 use App\Actions\Bookings\BookSeatAction;
 use App\Actions\Schedules\GenerateSessionsForSchedule;
 use App\Actions\Waitlist\JoinWaitlistAction;
+use App\Enums\PaymentStatus;
 use App\Enums\UserRole;
+use App\Models\Booking;
 use App\Models\ClassSession;
 use App\Models\ClassType;
+use App\Models\Payment;
 use App\Models\Schedule;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -76,6 +79,34 @@ class DemoSeeder extends Seeder
         }
 
         $this->seedBookingActivity();
+        $this->seedPaymentHistory();
+    }
+
+    /**
+     * Admin payments page demo rows: one refunded, one failed refund (retry
+     * button), one flagged external refund.
+     */
+    private function seedPaymentHistory(): void
+    {
+        $cancelled = Booking::factory()
+            ->cancelled()
+            ->create(['price_cents' => 1200]);
+        $refunded = Payment::factory()
+            ->succeeded()
+            ->create(['booking_id' => $cancelled->id, 'user_id' => $cancelled->user_id, 'amount_cents' => 1200]);
+        $refunded->status = PaymentStatus::Refunded;
+        $refunded->amount_refunded_cents = 1200;
+        $refunded->refunded_at = CarbonImmutable::now()->subDay();
+        $refunded->save();
+
+        $failedBooking = Booking::factory()
+            ->cancelled()
+            ->create(['price_cents' => 2500]);
+        Payment::factory()->refundFailed()
+            ->create(['booking_id' => $failedBooking->id, 'user_id' => $failedBooking->user_id, 'amount_cents' => 2500]);
+
+        Payment::factory()->succeeded()->flagged('external_refund')
+            ->create(['amount_cents' => 1500, 'amount_refunded_cents' => 1500]);
     }
 
     /**
