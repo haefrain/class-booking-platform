@@ -35,7 +35,7 @@ jobs:
       # Wayfinder output is gitignored; ESLint needs the generated route
       # modules to resolve @/routes imports.
       - name: Generate Wayfinder routes
-        run: php artisan wayfinder:generate
+        run: php artisan wayfinder:generate --with-form
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -115,7 +115,7 @@ jobs:
           php artisan key:generate
 
       - name: Generate Wayfinder routes
-        run: php artisan wayfinder:generate
+        run: php artisan wayfinder:generate --with-form
 
       - name: vue-tsc
         run: npm run types:check
