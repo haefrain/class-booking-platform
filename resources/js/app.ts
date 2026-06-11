@@ -17,6 +17,7 @@ createInertiaApp({
                 return AuthLayout;
             // Public pages: no authenticated sidebar shell.
             case name.startsWith('Catalog/'):
+            case name.startsWith('Sessions/'):
                 return null;
             case name.startsWith('settings/'):
                 return [AppLayout, SettingsLayout];
