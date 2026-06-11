@@ -40,7 +40,7 @@ Cuentas demo (contraseña `password`): `admin@classbooking.test` · `instructor@
 - [x] **B2** — Dominio: tipos de clase, horarios recurrentes, generación de sesiones a prueba de DST
 - [x] **B3** — Motor de reservas + waitlist FIFO (clases gratis), suite de concurrencia
 - [x] **B4** — Pagos Stripe modo test: checkout, webhooks, reembolsos, ofertas pagas de waitlist
-- [ ] **B5** — Recordatorios en cola + scheduler
+- [x] **B5** — Recordatorios en cola + scheduler
 - [ ] **B6** — UI completa para los tres roles
 - [ ] **B7** — Imagen Docker de producción, docs de arquitectura y ADRs
 

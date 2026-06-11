@@ -40,7 +40,7 @@ Demo accounts (password `password`): `admin@classbooking.test` · `instructor@cl
 - [x] **B2** — Domain: class types, recurring schedules, DST-safe session generation
 - [x] **B3** — Booking engine + FIFO waitlist (free classes), concurrency suite
 - [x] **B4** — Stripe test-mode payments: checkout, webhooks, refunds, paid waitlist offers
-- [ ] **B5** — Queued reminders + scheduler
+- [x] **B5** — Queued reminders + scheduler
 - [ ] **B6** — Complete UI for the three roles
 - [ ] **B7** — Production Docker image, architecture docs & ADRs
 
