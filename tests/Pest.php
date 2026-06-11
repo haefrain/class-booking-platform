@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -19,3 +20,18 @@ use Tests\TestCase;
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->in('Feature');
+
+/*
+|--------------------------------------------------------------------------
+| Concurrency suite
+|--------------------------------------------------------------------------
+|
+| Uses DatabaseTruncation instead of RefreshDatabase on purpose: the
+| wrapping test transaction would make row locks invisible to the second
+| MySQL connection (mysql_b). Do not "simplify" this back.
+|
+*/
+
+pest()->extend(TestCase::class)
+    ->use(DatabaseTruncation::class)
+    ->in('Concurrency');
