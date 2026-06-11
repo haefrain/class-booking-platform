@@ -21,6 +21,8 @@ use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
  */
 class SendBookingLifecycleMail implements ShouldQueueAfterCommit
 {
+    public string $queue = 'mail';
+
     public int $tries = 3;
 
     public int $backoff = 10;
