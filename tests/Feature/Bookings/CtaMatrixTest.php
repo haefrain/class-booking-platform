@@ -11,7 +11,6 @@ use App\Models\WaitlistEntry;
 
 /**
  * The full server-computed CTA matrix, table-driven (blueprint S6/S9).
- * Paid `pay` states are exercised from the payments milestone on.
  */
 dataset('cta-matrix', [
     'guest, free seat available' => ['guest', 'available', 'login'],
@@ -20,7 +19,8 @@ dataset('cta-matrix', [
     'student, full session' => ['student', 'full', 'join_waitlist'],
     'student, already waiting' => ['student', 'waiting', 'leave_waitlist'],
     'student, holds confirmed booking' => ['student', 'booked', 'cancel'],
-    'student, paid class (pre-payments)' => ['student', 'paid', 'closed'],
+    'student, paid class bookable' => ['student', 'paid', 'book'],
+    'student, pending payment hold' => ['student', 'pending', 'pay'],
     'student, cancelled session' => ['student', 'cancelled', 'closed'],
     'student, started session' => ['student', 'started', 'closed'],
     'admin browsing' => ['admin', 'available', 'closed'],
@@ -50,6 +50,10 @@ it('computes the right cta for every viewer/session state', function (string $vi
         })(),
         'booked' => (function () use ($session, $user): void {
             Booking::factory()->create(['class_session_id' => $session->id, 'user_id' => $user?->id]);
+            $session->increment('booked_count');
+        })(),
+        'pending' => (function () use ($session, $user): void {
+            Booking::factory()->pendingPayment()->create(['class_session_id' => $session->id, 'user_id' => $user?->id]);
             $session->increment('booked_count');
         })(),
         'cancelled' => $session->forceFill(['status' => 'cancelled'])->save(),
