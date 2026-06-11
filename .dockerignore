@@ -1,0 +1,36 @@
+# Secrets must never enter the image
+.env
+.env.*
+!.env.example
+
+.git
+.github
+.gitignore
+.gitattributes
+
+vendor
+node_modules
+public/build
+
+tests
+phpunit.xml
+phpstan.neon
+vitest.config.ts
+
+docs
+
+storage/logs/*
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+
+# Host-generated framework caches may reference dev-only packages; the
+# entrypoint rebuilds them inside the container.
+bootstrap/cache/*
+
+compose.yaml
+compose.prod.yaml
+Dockerfile
+.dockerignore
+README.md
+README.es.md
