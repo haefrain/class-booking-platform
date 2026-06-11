@@ -2,11 +2,14 @@
 
 namespace App\Providers;
 
+use App\Payments\PaymentGateway;
+use App\Payments\StripeGateway;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Stripe\StripeClient;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -15,7 +18,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(PaymentGateway::class, function () {
+            return new StripeGateway(
+                new StripeClient((string) config('payments.stripe.secret')),
+                (string) config('payments.stripe.webhook_secret'),
+            );
+        });
     }
 
     /**
