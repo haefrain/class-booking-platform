@@ -31,5 +31,7 @@ class DatabaseSeeder extends Seeder
             'name' => 'Sofía Student',
             'email' => 'student@classbooking.test',
         ]);
+
+        $this->call(DemoSeeder::class);
     }
 }
