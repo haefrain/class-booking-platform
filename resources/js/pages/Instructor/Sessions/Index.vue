@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
 import { formatSessionDay, formatTimeRange } from '@/lib/date';
-import { sessions } from '@/routes/instructor';
+import { sessions as instructorSessions } from '@/routes/instructor';
 import type { SessionSummary } from '@/types/booking';
 
 defineProps<{ sessions: SessionSummary[] }>();
 
 defineOptions({
     layout: {
-        breadcrumbs: [{ title: 'My sessions', href: sessions() }],
+        breadcrumbs: [{ title: 'My sessions', href: instructorSessions() }],
     },
 });
 </script>
