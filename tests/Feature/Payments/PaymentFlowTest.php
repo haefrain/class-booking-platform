@@ -142,7 +142,7 @@ it('ignores an expired webhook arriving after completion', function () {
         ->and($session->refresh()->booked_count)->toBe(1);
 });
 
-it('leaves the booking unconfirmed and flags the payment on amount mismatch', function () {
+it('expires the booking and flags the payment on amount mismatch', function () {
     $session = paidSession();
     $student = User::factory()->student()->create();
     app(BookSeatAction::class)->handle($student, $session->id, (string) Str::uuid());
@@ -154,8 +154,10 @@ it('leaves the booking unconfirmed and flags the payment on amount mismatch', fu
         'amount_total' => 1, 'currency' => 'usd', 'payment_intent' => 'pi_bad',
     ]);
 
-    expect($booking->refresh()->status)->toBe(BookingStatus::PendingPayment)
-        ->and($payment->refresh()->flag)->toBe('amount_mismatch');
+    // Full mismatch handling: never confirm, free the seat, auto-refund.
+    expect($booking->refresh()->status)->toBe(BookingStatus::Expired)
+        ->and($payment->refresh()->flag)->toBe('amount_mismatch')
+        ->and($this->gateway->refundCalls)->toHaveCount(1);
 });
 
 it('lets the owner pay an existing hold and blocks everyone else', function () {

@@ -20,6 +20,20 @@ class PaymentFactory extends Factory
     protected $model = Payment::class;
 
     /**
+     * Keep invariant I2 honest: a factory-made payment rides on an ACTIVE
+     * booking, whose seat must be counted on the session.
+     */
+    public function configure(): static
+    {
+        return $this->afterCreating(function (Payment $payment): void {
+            $booking = $payment->booking;
+            if ($booking !== null && $booking->isActive()) {
+                $booking->session?->increment('booked_count');
+            }
+        });
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function definition(): array
