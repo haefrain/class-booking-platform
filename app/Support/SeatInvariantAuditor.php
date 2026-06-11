@@ -91,4 +91,36 @@ class SeatInvariantAuditor
 
         return $violations;
     }
+
+    /**
+     * Operational alerts (not test invariants): surfaced by integrity:check.
+     *
+     * @return list<string>
+     */
+    public static function operationalAlerts(): array
+    {
+        $alerts = [];
+
+        // A 200-acked webhook whose job exhausted retries would otherwise
+        // vanish: Stripe never redelivers (M6).
+        $stuck = DB::table('stripe_events')
+            ->whereNull('processed_at')
+            ->where('created_at', '<', now()->subHour())
+            ->count();
+        if ($stuck > 0) {
+            $alerts[] = "{$stuck} webhook event(s) unprocessed for over an hour";
+        }
+
+        $flagged = DB::table('payments')->whereNotNull('flag')->count();
+        if ($flagged > 0) {
+            $alerts[] = "{$flagged} flagged payment(s) awaiting admin review";
+        }
+
+        $failed = DB::table('payments')->where('status', 'refund_failed')->count();
+        if ($failed > 0) {
+            $alerts[] = "{$failed} refund(s) failed — retry from the admin payments page";
+        }
+
+        return $alerts;
+    }
 }

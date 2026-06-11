@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace App\Actions\Payments;
 
+use App\Actions\Waitlist\PromoteNextWaiterAction;
 use App\Enums\BookingStatus;
 use App\Enums\PaymentStatus;
 use App\Events\BookingConfirmed;
+use App\Jobs\RefundPaymentJob;
 use App\Models\Booking;
 use App\Models\ClassSession;
 use App\Models\Payment;
+use App\Models\User;
+use App\Notifications\PaymentAutoRefundedNotification;
+use App\Notifications\SeatLostAfterPaymentNotification;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -17,16 +22,24 @@ use Illuminate\Support\Facades\Log;
 /**
  * The only path to `confirmed` for paid bookings — invoked by the completed
  * webhook AND the sweep's reconciliation. Idempotent: re-delivery hits the
- * confirmed no-op branch.
+ * confirmed no-op branch. Every non-confirming branch that captured money
+ * dispatches a refund: money is never silently kept.
  */
 class ConfirmPaidBookingAction
 {
+    public function __construct(
+        private readonly PromoteNextWaiterAction $promoteNextWaiter,
+    ) {}
+
     /**
      * @param  array{id: string, amount_total: int|null, currency: string|null, payment_intent: string|null}  $checkout
      */
     public function handle(array $checkout): void
     {
-        $confirmedBookingId = DB::transaction(function () use ($checkout): ?int {
+        /** @var array{confirmed: int|null, refund: int|null, seat_lost: int|null, refunded_after_cancel: int|null} $outcome */
+        $outcome = DB::transaction(function () use ($checkout): array {
+            $none = ['confirmed' => null, 'refund' => null, 'seat_lost' => null, 'refunded_after_cancel' => null];
+
             /** @var Payment|null $payment */
             $payment = Payment::query()
                 ->where('stripe_checkout_session_id', $checkout['id'])
@@ -34,7 +47,7 @@ class ConfirmPaidBookingAction
                 ->first();
 
             if ($payment === null) {
-                return null; // caller decides (webhook job releases + retries)
+                return $none; // webhook job releases + retries
             }
 
             /** @var ClassSession $session — locked FIRST, single lock ordering */
@@ -56,15 +69,22 @@ class ConfirmPaidBookingAction
                 $payment->flag = 'amount_mismatch';
                 $payment->save();
 
-                Log::warning('payment amount mismatch — booking left unconfirmed', [
+                if ($booking->status === BookingStatus::PendingPayment) {
+                    $booking->status = BookingStatus::Expired;
+                    $booking->payment_deadline_at = null; // I7
+                    $booking->save();
+                    $session->booked_count--;
+                    $session->save();
+                    $this->promoteNextWaiter->withinLockedSession($session);
+                }
+
+                Log::warning('payment amount mismatch — auto-refunding', [
                     'payment_id' => $payment->id,
                     'expected' => $payment->amount_cents,
                     'received' => $checkout['amount_total'],
                 ]);
 
-                // Full mismatch handling (auto-refund + seat release) lands
-                // with the refund pipeline milestone.
-                return null;
+                return [...$none, 'refund' => $payment->id];
             }
 
             switch ($booking->status) {
@@ -73,35 +93,93 @@ class ConfirmPaidBookingAction
                     $booking->payment_deadline_at = null; // I7
                     $booking->save();
 
-                    $payment->status = PaymentStatus::Succeeded;
-                    $payment->stripe_payment_intent_id = $checkout['payment_intent'];
-                    $payment->paid_at = CarbonImmutable::now();
-                    $payment->save();
+                    $this->markSucceeded($payment, $checkout['payment_intent']);
 
-                    return $booking->id;
+                    return [...$none, 'confirmed' => $booking->id];
 
                 case BookingStatus::Confirmed:
-                    return null; // dedup backstop: already processed
+                    return $none; // dedup backstop
 
-                default:
-                    // cancelled/expired branches (refund / guarded resurrect)
-                    // land with the refund pipeline milestone; record the
-                    // intent so money is never untraceable.
-                    $payment->stripe_payment_intent_id = $checkout['payment_intent'];
-                    $payment->status = PaymentStatus::Succeeded;
-                    $payment->save();
+                case BookingStatus::Cancelled:
+                    // (C1) The user expressed intent to leave; the seat may
+                    // already belong to a promoted waiter. NEVER resurrect.
+                    $this->markSucceeded($payment, $checkout['payment_intent']);
 
-                    Log::warning('payment completed for a non-pending booking', [
-                        'booking_id' => $booking->id,
-                        'status' => $booking->status->value,
-                    ]);
+                    return [...$none, 'refund' => $payment->id, 'refunded_after_cancel' => $booking->id];
 
-                    return null;
+                case BookingStatus::Expired:
+                    if ($this->canResurrect($session, $booking)) {
+                        // The ONE sanctioned resurrection (C2), fully guarded;
+                        // the counter increment is explicit so I2 holds.
+                        $booking->status = BookingStatus::Confirmed;
+                        $booking->save();
+                        $session->booked_count++;
+                        $session->save();
+
+                        $this->markSucceeded($payment, $checkout['payment_intent']);
+
+                        return [...$none, 'confirmed' => $booking->id];
+                    }
+
+                    $this->markSucceeded($payment, $checkout['payment_intent']);
+
+                    return [...$none, 'refund' => $payment->id, 'seat_lost' => $booking->id];
             }
         }, attempts: 3);
 
-        if ($confirmedBookingId !== null) {
-            event(new BookingConfirmed($confirmedBookingId));
+        if ($outcome['confirmed'] !== null) {
+            event(new BookingConfirmed($outcome['confirmed']));
+        }
+
+        if ($outcome['refund'] !== null) {
+            RefundPaymentJob::dispatch($outcome['refund'])->onQueue('critical');
+        }
+
+        $this->notifyAfterCommitOutcomes($outcome);
+    }
+
+    private function markSucceeded(Payment $payment, ?string $paymentIntent): void
+    {
+        $payment->status = PaymentStatus::Succeeded;
+        $payment->stripe_payment_intent_id = $paymentIntent;
+        $payment->paid_at = CarbonImmutable::now();
+        $payment->save();
+    }
+
+    private function canResurrect(ClassSession $session, Booking $booking): bool
+    {
+        if ($session->isCancelled() || $session->hasStarted()) {
+            return false;
+        }
+
+        if ($session->booked_count >= $session->capacity) {
+            return false;
+        }
+
+        return ! Booking::query()
+            ->where('class_session_id', $session->getKey())
+            ->where('user_id', $booking->user_id)
+            ->whereKeyNot($booking->getKey())
+            ->whereIn('status', [BookingStatus::PendingPayment, BookingStatus::Confirmed])
+            ->exists();
+    }
+
+    /**
+     * @param  array{confirmed: int|null, refund: int|null, seat_lost: int|null, refunded_after_cancel: int|null}  $outcome
+     */
+    private function notifyAfterCommitOutcomes(array $outcome): void
+    {
+        foreach (['seat_lost' => SeatLostAfterPaymentNotification::class, 'refunded_after_cancel' => PaymentAutoRefundedNotification::class] as $key => $notification) {
+            if ($outcome[$key] === null) {
+                continue;
+            }
+
+            $booking = Booking::query()->with(['user', 'session.classType'])->find($outcome[$key]);
+            /** @var User|null $user */
+            $user = $booking?->user;
+            if ($booking !== null && $user !== null) {
+                $user->notify(new $notification($booking));
+            }
         }
     }
 }

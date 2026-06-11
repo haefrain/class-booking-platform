@@ -17,6 +17,10 @@ class IntegrityCheck extends Command
     {
         $violations = SeatInvariantAuditor::violations();
 
+        foreach (SeatInvariantAuditor::operationalAlerts() as $alert) {
+            $this->warn($alert);
+        }
+
         if ($violations === []) {
             $this->info('All seat invariants hold.');
 

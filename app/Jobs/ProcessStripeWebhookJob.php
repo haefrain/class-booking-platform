@@ -12,6 +12,7 @@ use App\Models\StripeEvent;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Log;
 
 class ProcessStripeWebhookJob implements ShouldQueue
 {
@@ -67,13 +68,61 @@ class ProcessStripeWebhookJob implements ShouldQueue
                 }
                 break;
 
+            case 'charge.refunded':
+                $this->applyRefund($row->payload);
+                break;
+
             default:
-                // Unhandled types (charge.refunded lands with the refund
-                // milestone) are ledgered and marked processed.
+                // Unknown types are ledgered and marked processed.
                 break;
         }
 
         $row->processed_at = CarbonImmutable::now();
         $row->save();
+    }
+
+    /**
+     * Out-of-band refunds (dashboard, partial) must never desync money from
+     * seats silently (M1): partials and external fulls are flagged for the
+     * admin; the seat is NEVER auto-cancelled here.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function applyRefund(array $payload): void
+    {
+        $intentId = isset($payload['payment_intent']) ? (string) $payload['payment_intent'] : null;
+        $payment = $intentId === null
+            ? null
+            : Payment::query()->where('stripe_payment_intent_id', $intentId)->first();
+
+        if ($payment === null) {
+            Log::warning('charge.refunded with no matching payment', [
+                'payment_intent' => $intentId,
+            ]);
+
+            return;
+        }
+
+        $refunded = isset($payload['amount_refunded']) ? (int) $payload['amount_refunded'] : 0;
+        $payment->amount_refunded_cents = $refunded;
+
+        if ($refunded < $payment->amount_cents) {
+            $payment->flag = 'partial_refund'; // status unchanged — admin decides
+            $payment->save();
+
+            return;
+        }
+
+        $bookingActive = (bool) $payment->booking?->isActive();
+        $payment->status = PaymentStatus::Refunded;
+        $payment->refunded_at = CarbonImmutable::now();
+
+        if ($bookingActive) {
+            // Fully refunded from the dashboard while the seat is still
+            // held: surfaced, never auto-cancelled.
+            $payment->flag = 'external_refund';
+        }
+
+        $payment->save();
     }
 }
