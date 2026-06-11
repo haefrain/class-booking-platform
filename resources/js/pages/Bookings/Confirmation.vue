@@ -26,11 +26,13 @@ onMounted(() => {
 
     timer = setInterval(() => {
         polls += 1;
+
         if (polls > 20) {
             clearInterval(timer);
 
             return;
         }
+
         router.reload({ only: ['booking'] });
     }, 3000);
 });
