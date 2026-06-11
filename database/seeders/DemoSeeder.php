@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Actions\Bookings\BookSeatAction;
 use App\Actions\Schedules\GenerateSessionsForSchedule;
+use App\Actions\Waitlist\JoinWaitlistAction;
 use App\Enums\UserRole;
 use App\Models\ClassSession;
 use App\Models\ClassType;
@@ -12,6 +14,7 @@ use App\Models\Schedule;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 /**
  * Believable demo data: a small studio with free and paid classes, a busy
@@ -70,6 +73,42 @@ class DemoSeeder extends Seeder
             $generator->handle($schedule);
 
             $this->seedPastOccurrences($schedule);
+        }
+
+        $this->seedBookingActivity();
+    }
+
+    /**
+     * The Mailpit money shot, pre-staged: a popular class one seat from
+     * full, and a full class with a 3-deep waitlist — all through the real
+     * booking engine.
+     */
+    private function seedBookingActivity(): void
+    {
+        $book = app(BookSeatAction::class);
+        $join = app(JoinWaitlistAction::class);
+
+        $popular = ClassSession::query()->upcoming()
+            ->whereRelation('classType', 'slug', 'yoga-flow')
+            ->orderBy('starts_at')->first();
+
+        if ($popular !== null) {
+            User::factory()->student()->count($popular->capacity - 1)->create()
+                ->each(fn (User $student) => $book->handle($student, $popular->id, (string) Str::uuid()));
+        }
+
+        $full = ClassSession::query()->upcoming()
+            ->whereRelation('classType', 'slug', 'guided-meditation')
+            ->orderBy('starts_at')->first();
+
+        if ($full !== null) {
+            User::factory()->student()->count($full->capacity)->create()
+                ->each(fn (User $student) => $book->handle($student, $full->id, (string) Str::uuid()));
+
+            foreach (['Wanda Waitlist', 'Walter Waiting', 'Wendy Hopeful'] as $name) {
+                $waiter = User::factory()->student()->create(['name' => $name]);
+                $join->handle($waiter, $full->id);
+            }
         }
     }
 
