@@ -37,7 +37,7 @@ Demo accounts (password `password`): `admin@classbooking.test` · `instructor@cl
 ## Roadmap
 
 - [x] **B1** — Scaffold, Sail, roles, tooling (Pint, Larastan, Pest, vue-tsc), CI
-- [ ] **B2** — Domain: class types, recurring schedules, DST-safe session generation
+- [x] **B2** — Domain: class types, recurring schedules, DST-safe session generation
 - [ ] **B3** — Booking engine + FIFO waitlist (free classes), concurrency suite
 - [ ] **B4** — Stripe test-mode payments: checkout, webhooks, refunds, paid waitlist offers
 - [ ] **B5** — Queued reminders + scheduler
