@@ -8,11 +8,15 @@ use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Instructor\InstructorSessionController;
 use App\Http\Controllers\SessionController;
+use App\Http\Controllers\StripeWebhookController;
 use App\Http\Controllers\WaitlistController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::inertia('/', 'Welcome')->name('home');
+
+// System: signature-verified, CSRF-exempt (see bootstrap/app.php).
+Route::post('stripe/webhook', StripeWebhookController::class)->name('stripe.webhook');
 
 // Public: guests browse the catalog; mutation CTAs render as "login".
 Route::get('catalog', [CatalogController::class, 'index'])->name('catalog');
@@ -26,6 +30,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('sessions/{session}/bookings', [BookingController::class, 'store'])->name('bookings.store');
     Route::get('bookings/{booking}/confirmation', [BookingController::class, 'confirmation'])->name('bookings.confirmation');
     Route::delete('bookings/{booking}', [BookingController::class, 'destroy'])->name('bookings.destroy');
+    Route::post('bookings/{booking}/pay', [BookingController::class, 'pay'])->name('bookings.pay');
     Route::get('my/bookings', [BookingController::class, 'index'])->name('bookings.index');
 
     Route::post('sessions/{session}/waitlist', [WaitlistController::class, 'store'])->name('waitlist.store');

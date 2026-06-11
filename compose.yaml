@@ -72,6 +72,14 @@ services:
             - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
         networks:
             - sail
+    stripe:
+        image: stripe/stripe-cli:latest
+        profiles: [stripe]
+        command: listen --forward-to laravel.test/stripe/webhook --api-key ${STRIPE_SECRET}
+        networks:
+            - sail
+        depends_on:
+            - laravel.test
 networks:
     sail:
         driver: bridge

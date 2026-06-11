@@ -58,9 +58,7 @@ class SessionViewer
             return 'join_waitlist';
         }
 
-        // Paid checkout ships with the payments milestone; until then paid
-        // classes are browse-only.
-        return $session->classType->isFree() ? 'book' : 'closed';
+        return 'book'; // paid classes redirect into Stripe Checkout
     }
 
     private static function activeBooking(?User $user, ClassSession $session): ?Booking

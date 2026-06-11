@@ -6,6 +6,8 @@ namespace App\Http\Controllers;
 
 use App\Actions\Bookings\BookSeatAction;
 use App\Actions\Bookings\CancelBookingAction;
+use App\Actions\Payments\CreateCheckoutForBookingAction;
+use App\Actions\Payments\ExpirePendingBookingAction;
 use App\Enums\BookingStatus;
 use App\Enums\WaitlistStatus;
 use App\Exceptions\SessionNotBookableException;
@@ -14,6 +16,7 @@ use App\Models\Booking;
 use App\Models\ClassSession;
 use App\Models\User;
 use App\Models\WaitlistEntry;
+use App\Payments\GatewayException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -21,8 +24,13 @@ use Inertia\Response;
 
 class BookingController extends Controller
 {
-    public function store(Request $request, ClassSession $session, BookSeatAction $action): RedirectResponse
-    {
+    public function store(
+        Request $request,
+        ClassSession $session,
+        BookSeatAction $action,
+        CreateCheckoutForBookingAction $createCheckout,
+        ExpirePendingBookingAction $releaseSeat,
+    ): RedirectResponse|\Symfony\Component\HttpFoundation\Response {
         $this->authorize('create', [Booking::class, $session]);
 
         $validated = $request->validate([
@@ -32,14 +40,33 @@ class BookingController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        // Paid checkout ships with the payments milestone.
-        if (! $session->classType->isFree()) {
-            throw new SessionNotBookableException('Online payment for this class is coming soon.');
-        }
-
         $booking = $action->handle($user, $session->id, (string) $validated['idempotency_key']);
 
-        return redirect("/bookings/{$booking->id}/confirmation");
+        if ($booking->status === BookingStatus::Confirmed) {
+            return redirect("/bookings/{$booking->id}/confirmation");
+        }
+
+        // Paid: post-commit checkout creation; the seat is already held.
+        try {
+            $url = $createCheckout->handle($booking);
+        } catch (GatewayException $e) {
+            // Stripe down → release the seat instead of stranding the hold.
+            report($e);
+            $releaseSeat->handle($booking->id);
+
+            throw new SessionNotBookableException('Payment could not be started — please try again.');
+        }
+
+        // External redirect: Inertia requires a location visit, never a
+        // plain redirect (blueprint S3).
+        return Inertia::location($url);
+    }
+
+    public function pay(Request $request, Booking $booking, CreateCheckoutForBookingAction $createCheckout): \Symfony\Component\HttpFoundation\Response
+    {
+        $this->authorize('pay', $booking);
+
+        return Inertia::location($createCheckout->handle($booking));
     }
 
     public function confirmation(Request $request, Booking $booking): Response

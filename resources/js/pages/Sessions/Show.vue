@@ -64,6 +64,12 @@ function cancelBooking() {
         </header>
 
         <main class="mx-auto max-w-2xl px-6 py-12">
+            <p
+                v-if="$page.props.stripeTestMode"
+                class="mb-6 rounded-md border border-amber-400/50 bg-amber-400/10 px-3 py-2 text-xs text-amber-700"
+            >
+                Stripe test mode — use card 4242 4242 4242 4242.
+            </p>
             <p class="text-sm tracking-wide text-muted-foreground uppercase">
                 {{ formatSessionDay(session.starts_at) }}
             </p>
@@ -108,6 +114,18 @@ function cancelBooking() {
                     @click="book"
                 >
                     Book this class
+                </button>
+
+                <button
+                    v-else-if="viewer.cta === 'pay'"
+                    type="button"
+                    class="inline-flex rounded-lg bg-primary px-5 py-2.5 font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                    :disabled="busy"
+                    @click="
+                        submit('post', `/bookings/${viewer.booking_id}/pay`)
+                    "
+                >
+                    Complete payment
                 </button>
 
                 <button

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
+import { onMounted, onUnmounted } from 'vue';
 import { formatSessionDay, formatTimeRange } from '@/lib/date';
 import type { SessionSummary } from '@/types/booking';
 
-defineProps<{
+const props = defineProps<{
     booking: {
         id: number;
         status: string;
@@ -12,6 +13,29 @@ defineProps<{
     };
     session: SessionSummary;
 }>();
+
+// The redirect back from Checkout never confirms by itself — only the
+// webhook/reconciliation does. Poll briefly while the booking is pending.
+let timer: ReturnType<typeof setInterval> | undefined;
+let polls = 0;
+
+onMounted(() => {
+    if (props.booking.status !== 'pending_payment') {
+        return;
+    }
+
+    timer = setInterval(() => {
+        polls += 1;
+        if (polls > 20) {
+            clearInterval(timer);
+
+            return;
+        }
+        router.reload({ only: ['booking'] });
+    }, 3000);
+});
+
+onUnmounted(() => clearInterval(timer));
 </script>
 
 <template>
@@ -22,6 +46,17 @@ defineProps<{
             <template v-if="booking.status === 'confirmed'">
                 <p class="text-5xl">🎉</p>
                 <h1 class="mt-4 text-2xl font-semibold">You're booked!</h1>
+            </template>
+            <template v-else-if="booking.status === 'pending_payment'">
+                <p class="text-5xl">⏳</p>
+                <h1 class="mt-4 text-2xl font-semibold">
+                    Confirming your payment…
+                </h1>
+                <p class="mt-2 text-sm text-muted-foreground">
+                    This page refreshes automatically. If it takes more than a
+                    minute, your bank may still be processing — we hold your
+                    seat until the payment deadline.
+                </p>
             </template>
             <template v-else>
                 <h1 class="mt-4 text-2xl font-semibold">

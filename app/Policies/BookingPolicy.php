@@ -25,6 +25,12 @@ class BookingPolicy
         return $user->isAdmin() || $booking->user_id === $user->getKey();
     }
 
+    /** Own pending holds only — the action re-guards pending_payment. */
+    public function pay(User $user, Booking $booking): bool
+    {
+        return $booking->user_id === $user->getKey();
+    }
+
     public function cancel(User $user, Booking $booking): bool
     {
         return $user->isAdmin() || $booking->user_id === $user->getKey();

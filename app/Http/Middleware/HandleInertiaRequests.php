@@ -51,6 +51,7 @@ class HandleInertiaRequests extends Middleware
                     'email_verified_at' => $user->email_verified_at?->toIso8601String(),
                 ],
             ],
+            'stripeTestMode' => str_starts_with((string) config('payments.stripe.secret'), 'sk_test_'),
             'flash' => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),
