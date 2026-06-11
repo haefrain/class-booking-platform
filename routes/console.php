@@ -14,3 +14,6 @@ Schedule::command('sessions:generate')->dailyAt('03:10');
 
 // Detection layer of the seat-integrity defence (I1–I7).
 Schedule::command('integrity:check')->hourly();
+
+// Stripe-first hold release + webhook-loss reconciliation.
+Schedule::command('bookings:expire-pending')->everyMinute();
